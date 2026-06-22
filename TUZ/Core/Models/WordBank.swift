@@ -1,52 +1,48 @@
 import Foundation
 
-/// Kelimelik kelime bankası. `Resources/WordBank.json` dosyasından yüklenir;
-/// dosya bulunamazsa küçük bir gömülü liste ile çalışmaya devam eder.
-///
-/// Tüm kelimeler Türkçe büyük harfe (tr_TR) çevrilerek tutulur; günün kelimesi
-/// tarihe göre deterministik seçilir, böylece tüm aile aynı kelimeyi oynar.
+/// Kelimelik kelime bankası — kelimeler uzunluğa göre gruplanır (3/4/5/6 harf).
+/// `Resources/WordBank.json` dosyasından yüklenir; dosya yoksa gömülü yedek kullanılır.
+/// Tüm kelimeler Türkçe büyük harfe (tr_TR) çevrilir.
 final class WordBank {
     static let shared = WordBank()
 
-    let words: [String]
-    private let wordSet: Set<String>
-
-    private struct WordBankFile: Decodable {
-        let words: [String]
-    }
+    private var byLength: [Int: [String]] = [:]
 
     init() {
-        var loaded: [String] = []
+        var loaded: [Int: [String]] = [:]
         if let url = Bundle.main.url(forResource: "WordBank", withExtension: "json"),
            let data = try? Data(contentsOf: url),
-           let file = try? JSONDecoder().decode(WordBankFile.self, from: data) {
-            loaded = file.words
+           let raw = try? JSONDecoder().decode([String: [String]].self, from: data) {
+            for (key, words) in raw {
+                if let length = Int(key) {
+                    loaded[length] = words.map { $0.turkishUppercased() }.filter { $0.count == length }
+                }
+            }
         }
         if loaded.isEmpty {
             loaded = WordBank.fallback
         }
-        // Yalnızca tam 5 harfli kelimeleri al, Türkçe büyük harfe çevir, tekille.
-        let normalized = loaded
-            .map { $0.turkishUppercased() }
-            .filter { $0.count == 5 }
-        self.words = Array(Set(normalized)).sorted()
-        self.wordSet = Set(self.words)
+        byLength = loaded
     }
 
-    /// Verilen gün indeksine karşılık gelen günün kelimesi.
-    func dailyAnswer(index: Int) -> String {
-        guard !words.isEmpty else { return "KALEM" }
-        let i = ((index % words.count) + words.count) % words.count
-        return words[i]
+    /// Verilen uzunluktaki kelimeler (azalan güvenle yedeğe düşer).
+    func words(length: Int) -> [String] {
+        if let words = byLength[length], !words.isEmpty { return words }
+        return WordBank.fallback[length] ?? ["KALEM"]
     }
 
-    /// Tahminin geçerli (listede olan) bir kelime olup olmadığı.
-    func isValid(_ guess: String) -> Bool {
-        wordSet.contains(guess.turkishUppercased())
+    /// Deterministik seçim: aynı (uzunluk, indeks) her zaman aynı kelimeyi verir.
+    func answer(length: Int, index: Int) -> String {
+        let pool = words(length: length)
+        guard !pool.isEmpty else { return "KALEM" }
+        let i = ((index % pool.count) + pool.count) % pool.count
+        return pool[i]
     }
 
-    private static let fallback = [
-        "KALEM", "KİTAP", "ARMUT", "DENİZ", "ÇİÇEK",
-        "SABAH", "HUZUR", "SEVGİ", "GÜNEŞ", "BAHÇE"
+    private static let fallback: [Int: [String]] = [
+        3: ["KOL", "GÜL", "TUZ", "YOL", "BAL", "KAR"],
+        4: ["MASA", "ELMA", "KEDİ", "KAPI", "OYUN", "PARA"],
+        5: ["KALEM", "KİTAP", "ÇİÇEK", "DENİZ", "SEVGİ", "HUZUR"],
+        6: ["KARPUZ", "DEFTER", "BALKON", "MUTFAK", "PEYNİR", "ZEYTİN"]
     ]
 }

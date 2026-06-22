@@ -3,9 +3,10 @@ import Foundation
 /// Bir harfin tahmindeki durumu (renk geri bildirimi).
 enum LetterFeedback {
     case correct  // doğru harf, doğru yer (yeşil)
-    case present  // kelimede var ama yanlış yer (sarı/amber)
+    case present  // kelimede var ama yanlış yer (amber)
     case absent   // kelimede yok (gri)
     case empty    // henüz girilmemiş kutu
+    case hint     // ipucu olarak açılmış harf
 }
 
 /// Izgarada tek bir kutu.
@@ -20,13 +21,5 @@ enum KelimelikState: Equatable {
     case won(attempts: Int)
     case lost(answer: String)
 
-    var isFinished: Bool {
-        self != .playing
-    }
-}
-
-/// Cihazda saklanan günlük ilerleme (uygulama kapanıp açılsa da korunur).
-struct KelimelikProgress: Codable {
-    var guesses: [String]
-    var finished: Bool
+    var isFinished: Bool { self != .playing }
 }

@@ -1,73 +1,106 @@
 import Foundation
 import Observation
 
-/// Kelimelik (Türkçe 5 harf Wordle) oyun mantığı.
+/// Kelimelik oyun mantığı — kademeli seviyeler, ipuçları, kullanıcı dostu kurallar.
 ///
-/// - Günün kelimesi tarihe göre deterministik seçilir (tüm aile aynı kelimeyi oynar).
-/// - 6 deneme hakkı, harf harf renk geri bildirimi (yeşil/sarı/gri).
-/// - Oyun bittiğinde `onComplete` ile skoru dışarıya bildirir (View bunu havuza yazar).
-/// - Günlük ilerleme cihazda saklanır; uygulama yeniden açıldığında tahta geri yüklenir.
+/// - Izgara seviyeyle büyür (3→6 harf). İpuçları ızgaranın ~%12'si kadar açık gelir.
+/// - **Kelime listesi doğrulaması yok**: doğru uzunlukta her tahmin kabul edilir.
+/// - Her yeni seviye ilk kez kazanılınca puan aile havuzuna yazılır (`onScore`).
+/// - İlerleme cihazda saklanır (üye bazında mevcut seviye).
 @Observable
 final class KelimelikViewModel {
-    let wordLength = 5
-    let maxAttempts = 6
+    private let memberID: String
+    private let bank: WordBank
 
-    private(set) var answer: String
+    private(set) var level: KelimelikLevel
+    private(set) var answer: String = ""
+    private(set) var hintPositions: Set<Int> = []
     private(set) var guesses: [String] = []
     private(set) var current: String = ""
     private(set) var state: KelimelikState = .playing
     private(set) var letterStates: [String: LetterFeedback] = [:]
-
-    /// Kullanıcıya gösterilecek geçici uyarı (örn. "Kelime listede yok").
     var message: String?
 
-    /// Oyun ilk kez bittiğinde çağrılır: (kazanılan puan, açıklama).
-    var onComplete: ((Int, String) -> Void)?
+    /// Yeni bir seviye ilk kez kazanılınca puanı havuza yazmak için.
+    var onScore: ((Int) -> Void)?
 
-    private let bank: WordBank
-    private let memberID: String
-    private let dayIndex: Int
-    private let dayKey: String
-    private var didRecord = false
+    private var levelIndex: Int
 
-    init(memberID: String, date: Date = .now, bank: WordBank = .shared) {
+    var wordLength: Int { level.wordLength }
+    var attempts: Int { level.attempts }
+    var isLastLevel: Bool { levelIndex >= KelimelikProgression.count - 1 }
+    var hasHints: Bool { !hintPositions.isEmpty }
+
+    init(memberID: String, bank: WordBank = .shared) {
         self.memberID = memberID
         self.bank = bank
-        self.dayIndex = DailyClock.dayIndex(for: date)
-        self.dayKey = DailyClock.dateKey(for: date)
-        self.answer = bank.dailyAnswer(index: dayIndex)
-        loadProgress()
+        self.levelIndex = UserDefaults.standard.integer(forKey: "kelimelik.level.\(memberID)")
+        self.level = KelimelikProgression.level(at: levelIndex)
+        setupLevel()
+    }
+
+    // MARK: - Seviye kurulumu
+
+    private func setupLevel() {
+        level = KelimelikProgression.level(at: levelIndex)
+        answer = bank.answer(length: level.wordLength, index: levelIndex)
+        hintPositions = Self.hintPositions(count: level.hintCount, length: level.wordLength, seed: levelIndex)
+        guesses = []
+        current = ""
+        state = .playing
+        letterStates = [:]
+        message = nil
+    }
+
+    /// Deterministik ipucu konumları (aynı seviyede hep aynı ipuçları).
+    private static func hintPositions(count: Int, length: Int, seed: Int) -> Set<Int> {
+        guard count > 0, length > 0 else { return [] }
+        var positions = Array(0..<length)
+        var s = UInt64(bitPattern: Int64(seed &* 2_654_435_761 &+ 1))
+        func nextInt() -> Int {
+            s = s &* 6_364_136_223_846_793_005 &+ 1_442_695_040_888_963_407
+            return Int(s >> 33)
+        }
+        for i in stride(from: positions.count - 1, to: 0, by: -1) {
+            let j = nextInt() % (i + 1)
+            positions.swapAt(i, j)
+        }
+        return Set(positions.prefix(count))
+    }
+
+    /// İpucu satırı: açık konumlarda harf, diğerlerinde boş.
+    var hintRow: [LetterTile] {
+        let letters = answer.letters
+        return (0..<wordLength).map { i in
+            if hintPositions.contains(i), i < letters.count {
+                return LetterTile(letter: letters[i], feedback: .hint)
+            }
+            return LetterTile(letter: "", feedback: .empty)
+        }
     }
 
     // MARK: - Girdi
 
     func tap(_ letter: String) {
-        guard state == .playing else { return }
-        guard current.letters.count < wordLength else { return }
+        guard state == .playing, current.letters.count < wordLength else { return }
         current += letter.turkishUppercased()
         message = nil
     }
 
     func deleteLast() {
-        guard state == .playing else { return }
-        guard !current.isEmpty else { return }
+        guard state == .playing, !current.isEmpty else { return }
         current.removeLast()
         message = nil
     }
 
     func submit() {
         guard state == .playing else { return }
-
         let guess = current.turkishUppercased()
         guard guess.letters.count == wordLength else {
-            message = "5 harfli bir kelime girin"
+            message = "\(wordLength) harf gir"
             return
         }
-        guard bank.isValid(guess) else {
-            message = "Kelime listede yok"
-            return
-        }
-
+        // Kullanıcı dostu: kelime listesi doğrulaması YOK; uzunluk yeterli.
         let feedback = evaluate(guess: guess)
         guesses.append(guess)
         updateLetterStates(guess: guess, feedback: feedback)
@@ -75,40 +108,60 @@ final class KelimelikViewModel {
         message = nil
 
         if feedback.allSatisfy({ $0 == .correct }) {
-            let attempts = guesses.count
-            state = .won(attempts: attempts)
-            finish(points: points(forAttempts: attempts), detail: "\(answer)|\(attempts)")
-        } else if guesses.count >= maxAttempts {
+            state = .won(attempts: guesses.count)
+            awardIfFirstWin()
+        } else if guesses.count >= attempts {
             state = .lost(answer: answer)
-            finish(points: 0, detail: "\(answer)|0")
         }
+    }
 
-        saveProgress()
+    // MARK: - İlerleme
+
+    func nextLevel() {
+        guard case .won = state else { return }
+        levelIndex = min(levelIndex + 1, KelimelikProgression.count - 1)
+        UserDefaults.standard.set(levelIndex, forKey: "kelimelik.level.\(memberID)")
+        setupLevel()
+    }
+
+    func retry() {
+        setupLevel()
+    }
+
+    var earnedPoints: Int {
+        guard case .won = state else { return 0 }
+        return points()
+    }
+
+    private func awardIfFirstWin() {
+        let key = "kelimelik.awarded.\(memberID)"
+        let awardedCount = UserDefaults.standard.integer(forKey: key)
+        guard levelIndex >= awardedCount else { return }
+        UserDefaults.standard.set(levelIndex + 1, forKey: key)
+        onScore?(points())
+    }
+
+    private func points() -> Int {
+        let left = max(0, attempts - guesses.count)
+        return level.wordLength * 10 + left * 5 + 10
     }
 
     // MARK: - Izgara
 
-    /// Görüntülenecek 6×5 kutu ızgarası (tamamlanan satırlar + aktif satır + boşlar).
     var grid: [[LetterTile]] {
         var rows: [[LetterTile]] = []
-
         for guess in guesses {
             let letters = guess.letters
-            let feedback = evaluate(guess: guess)
-            rows.append(zip(letters, feedback).map { LetterTile(letter: $0, feedback: $1) })
+            let fb = evaluate(guess: guess)
+            rows.append(zip(letters, fb).map { LetterTile(letter: $0, feedback: $1) })
         }
-
-        if state == .playing && rows.count < maxAttempts {
+        if state == .playing && rows.count < attempts {
             let typed = current.letters
-            var row: [LetterTile] = []
-            for index in 0..<wordLength {
-                let letter = index < typed.count ? typed[index] : ""
-                row.append(LetterTile(letter: letter, feedback: .empty))
-            }
-            rows.append(row)
+            rows.append((0..<wordLength).map { i in
+                LetterTile(letter: i < typed.count ? typed[i] : "", feedback: .empty)
+            })
         }
-
-        while rows.count < maxAttempts {
+        while rows.count < attempts {
             rows.append(Array(repeating: LetterTile(letter: "", feedback: .empty), count: wordLength))
         }
         return rows
@@ -116,45 +169,34 @@ final class KelimelikViewModel {
 
     // MARK: - Değerlendirme
 
-    /// Tahmini cevaba göre değerlendirir (tekrar eden harfleri doğru sayar).
     func evaluate(guess: String) -> [LetterFeedback] {
         let g = guess.letters
         let a = answer.letters
         var result = Array(repeating: LetterFeedback.absent, count: g.count)
         var remaining: [String: Int] = [:]
-        for letter in a {
-            remaining[letter, default: 0] += 1
-        }
-
-        // 1. geçiş: doğru yerdekiler
+        for ch in a { remaining[ch, default: 0] += 1 }
         for i in g.indices where i < a.count && g[i] == a[i] {
             result[i] = .correct
-            if let count = remaining[g[i]] {
-                remaining[g[i]] = count - 1
-            }
+            if let c = remaining[g[i]] { remaining[g[i]] = c - 1 }
         }
-        // 2. geçiş: kelimede olup yanlış yerdekiler
         for i in g.indices where result[i] != .correct {
-            let letter = g[i]
-            if let count = remaining[letter], count > 0 {
+            let ch = g[i]
+            if let c = remaining[ch], c > 0 {
                 result[i] = .present
-                remaining[letter] = count - 1
+                remaining[ch] = c - 1
             }
         }
         return result
     }
 
     private func updateLetterStates(guess: String, feedback: [LetterFeedback]) {
-        let letters = guess.letters
-        for (letter, newState) in zip(letters, feedback) {
-            let existing = letterStates[letter]
-            if shouldOverride(existing: existing, with: newState) {
+        for (letter, newState) in zip(guess.letters, feedback) {
+            if shouldOverride(existing: letterStates[letter], with: newState) {
                 letterStates[letter] = newState
             }
         }
     }
 
-    /// Klavye renk önceliği: doğru > var > yok.
     private func shouldOverride(existing: LetterFeedback?, with new: LetterFeedback) -> Bool {
         guard let existing else { return true }
         func rank(_ f: LetterFeedback) -> Int {
@@ -162,55 +204,9 @@ final class KelimelikViewModel {
             case .correct: return 3
             case .present: return 2
             case .absent: return 1
-            case .empty: return 0
+            default: return 0
             }
         }
         return rank(new) > rank(existing)
-    }
-
-    // MARK: - Skor
-
-    /// Daha az denemede bulan daha çok puan alır (1. denemede 60 → 6. denemede 10).
-    private func points(forAttempts attempts: Int) -> Int {
-        max(0, (maxAttempts - attempts + 1)) * 10
-    }
-
-    private func finish(points: Int, detail: String) {
-        guard !didRecord else { return }
-        didRecord = true
-        onComplete?(points, detail)
-    }
-
-    // MARK: - İlerleme kalıcılığı (cihaz içi)
-
-    private var progressKey: String { "kelimelik.\(memberID).\(dayKey)" }
-
-    private func saveProgress() {
-        let progress = KelimelikProgress(guesses: guesses, finished: state.isFinished)
-        if let data = try? JSONEncoder().encode(progress) {
-            UserDefaults.standard.set(data, forKey: progressKey)
-        }
-    }
-
-    private func loadProgress() {
-        guard
-            let data = UserDefaults.standard.data(forKey: progressKey),
-            let progress = try? JSONDecoder().decode(KelimelikProgress.self, from: data)
-        else { return }
-
-        for guess in progress.guesses {
-            guesses.append(guess)
-            updateLetterStates(guess: guess, feedback: evaluate(guess: guess))
-        }
-
-        if progress.finished {
-            // Skor ilk bitişte zaten yazıldı; tekrar yazma.
-            didRecord = true
-            if let last = guesses.last, evaluate(guess: last).allSatisfy({ $0 == .correct }) {
-                state = .won(attempts: guesses.count)
-            } else {
-                state = .lost(answer: answer)
-            }
-        }
     }
 }
