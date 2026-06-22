@@ -68,11 +68,35 @@ struct LevelView: View {
             if controller.reachedGoal {
                 goalBanner
             } else {
-                powerButton(controller)
+                controlsRow(controller)
             }
         }
         .padding(.bottom, 28)
         .padding(.top, 8)
+    }
+
+    private func controlsRow(_ controller: LevelSceneController) -> some View {
+        HStack(spacing: 12) {
+            powerButton(controller)
+            if controller.canRotate {
+                rotateButton(controller)
+            }
+        }
+    }
+
+    private func rotateButton(_ controller: LevelSceneController) -> some View {
+        Button {
+            controller.rotate()
+        } label: {
+            Label("Döndür", systemImage: "rotate.3d")
+                .font(TUZFont.headline)
+                .foregroundStyle(.white)
+                .padding(.horizontal, 20)
+                .padding(.vertical, 13)
+                .background(TUZColor.cini, in: Capsule())
+                .shadow(color: TUZColor.ink.opacity(0.2), radius: 8, y: 4)
+        }
+        .buttonStyle(.plain)
     }
 
     private func powerButton(_ controller: LevelSceneController) -> some View {

@@ -8,7 +8,7 @@ enum LevelLibrary {
         all.first { $0.id == id }
     }
 
-    static let all: [LevelData] = [bolum1, bolum2, bolum3]
+    static let all: [LevelData] = [bolum1, bolum2, bolum3, bolum4]
 
     // MARK: - Bölüm 1 — Avlu (yükselen basit yol)
     static let bolum1 = LevelData(
@@ -79,5 +79,41 @@ enum LevelLibrary {
         ],
         startID: "a",
         goalID: "h"
+    )
+
+    // MARK: - Bölüm 4 — Işıklı Eyvan (döndürme + perspektif hizalama)
+    //
+    // İmkânsız geometri: "m" ve hedef "g" dönen bir kola bağlıdır. Kol döndürülünce
+    // "m", yerdeki "gap" ile ekran-uzayında çakışır (ortografik kamera) ve aralarında
+    // gerçek bir geçiş (seam) oluşur; ancak o zaman hedefe ulaşılabilir.
+    //
+    // Hizalama kuralı: kamera (1,1,1) yönüne baktığı için, dünyada (1,1,1) yönünce
+    // farklı iki nokta ekranda üst üste düşer. Döndükten sonra m=(4,2,4), gap=(2,0,2);
+    // fark (2,2,2) ∝ (1,1,1) → ekranda çakışır → seam aktifleşir.
+    static let bolum4 = LevelData(
+        id: "bolum4",
+        title: "Işıklı Eyvan",
+        subtitle: "Kolu döndür, yolları hizala (imkânsız geometri)",
+        nodes: [
+            LevelNode(id: "s0", point: .init(x: 0, y: 0, z: 0)),
+            LevelNode(id: "s1", point: .init(x: 1, y: 0, z: 0)),
+            LevelNode(id: "s2", point: .init(x: 2, y: 0, z: 0)),
+            LevelNode(id: "s3", point: .init(x: 2, y: 0, z: 1)),
+            LevelNode(id: "gap", point: .init(x: 2, y: 0, z: 2)),
+            LevelNode(id: "m", point: .init(x: 2, y: 2, z: 2)),   // dönen kolun ucu
+            LevelNode(id: "g", point: .init(x: 1, y: 2, z: 2))    // hedef (kola bağlı)
+        ],
+        edges: [
+            .init(a: "s0", b: "s1"), .init(a: "s1", b: "s2"), .init(a: "s2", b: "s3"),
+            .init(a: "s3", b: "gap"), .init(a: "m", b: "g")
+        ],
+        startID: "s0",
+        goalID: "g",
+        rotators: [
+            LevelRotator(id: "arm", pivot: .init(x: 4, y: 2, z: 2), nodeIDs: ["m", "g"])
+        ],
+        seams: [
+            LevelSeam(a: "gap", b: "m")
+        ]
     )
 }

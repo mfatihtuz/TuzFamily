@@ -11,8 +11,11 @@ enum SceneArt {
     static let glow = UIColor(hex: "#E8C766")       // Yol Gösteren parıltısı
     static let none = UIColor.black                 // emission kapalı
 
-    // Sahne ölçüleri (grid → dünya birimi)
-    static let unit: Float = 1.25       // yatay karo aralığı
-    static let unitHeight: Float = 0.7  // bir yükseklik kademesi
-    static let blockHeight: CGFloat = 0.5
+    // Sahne ölçüleri (grid → dünya birimi).
+    // ÖNEMLİ: yatay ve dikey birim EŞİT olmalı. Kamera dünya (1,1,1) yönüne baktığı
+    // için perspektif hizalama (imkânsız geometri) ancak ölçek tekdüze olduğunda
+    // doğru çalışır: grid'de (k,k,k) farkı → dünyada (k,k,k) → ekranda çakışma.
+    static let unit: Float = 1.0        // yatay karo aralığı
+    static let unitHeight: Float = 1.0  // bir yükseklik kademesi (= unit)
+    static let blockHeight: CGFloat = 1.0
 }
