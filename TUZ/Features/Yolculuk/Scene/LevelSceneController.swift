@@ -5,12 +5,10 @@ import simd
 
 /// Bir bölümün SceneKit sahnesini kuran ve oynanışı yöneten denetleyici.
 ///
-/// - **Kamera:** ortografik + eğik izometrik (MV açısı). Ortografik şarttır:
-///   perspektif kısalması olmadığı için "imkânsız geometri" mümkün olur (GDD §4, §10).
-/// - **Ortam:** her yürünebilir nokta, zemine kadar inen içi dolu bir taş sütun +
-///   aydınlık üst yüzey olarak kurulur (uçuşan blok değil, mimari kütle). Harici
-///   3D dosya yok (placeholder, GDD §11).
-/// - **Tap-to-move / döndürme / perspektif hizalama / Yol Gösteren** (GDD §5, §6).
+/// Monument Valley görünümü için **flat gölgeleme** (`.constant` lighting):
+/// gerçekçi ışık/gölge yok; her küp yüzüne yönüne göre düz ton verilir (üst
+/// aydınlık, iki yan iki ton). Kamera ortografik + eğik izometrik (perspektif
+/// kısalması olmadığından "imkânsız geometri" mümkün — GDD §4, §10).
 @Observable
 final class LevelSceneController {
     let scene = SCNScene()
@@ -28,9 +26,10 @@ final class LevelSceneController {
     private var graph: PathGraph
     private let rig: CharacterRig
 
-    private var nodeWorldPos: [String: SCNVector3] = [:]   // yürüme yüzeyi (başlangıç)
-    private var tileNodes: [String: SCNNode] = [:]         // origin = yürüme yüzeyi
-    private var tileMaterials: [String: SCNMaterial] = [:] // üst kapak malzemesi
+    private var nodeWorldPos: [String: SCNVector3] = [:]
+    private var tileNodes: [String: SCNNode] = [:]
+    private var tileTopMaterials: [String: SCNMaterial] = [:]
+    private var tileTopBaseColor: [String: UIColor] = [:]
     private var rotatorNodes: [String: SCNNode] = [:]
     private var activeSeams: [LevelEdge] = []
     private var currentNodeID: String
@@ -38,7 +37,7 @@ final class LevelSceneController {
 
     private var sceneCenter = SCNVector3(0, 0, 0)
     private var sceneRadius: Float = 6
-    private var baseY: Float = -1.6
+    private var baseY: Float = -1.4
 
     private let alignmentThreshold: Float = 0.45
 
@@ -57,7 +56,6 @@ final class LevelSceneController {
         computeFraming()
         scene.background.contents = SceneArt.sky
         setupCamera()
-        setupLights()
         buildGround()
         buildRotators()
         buildTiles()
@@ -76,7 +74,6 @@ final class LevelSceneController {
         )
     }
 
-    /// Karonun üst (yürüme) yüzeyinin güncel dünya konumu (döndürme sonrası dahil).
     private func walkWorldPosition(_ id: String) -> SCNVector3 {
         tileNodes[id]?.worldPosition ?? nodeWorldPos[id] ?? SCNVector3(0, 0, 0)
     }
@@ -98,7 +95,6 @@ final class LevelSceneController {
                 }
             }
         }
-
         guard let first = positions.first else { return }
         var minX = first.x, maxX = first.x
         var minY = first.y, maxY = first.y
@@ -117,7 +113,7 @@ final class LevelSceneController {
     private func setupCamera() {
         let camera = SCNCamera()
         camera.usesOrthographicProjection = true
-        camera.orthographicScale = Double(sceneRadius) * 0.62 + 2.2
+        camera.orthographicScale = Double(sceneRadius) * 0.62 + 2.0
         camera.zNear = 0.1
         camera.zFar = 500
         cameraNode.camera = camera
@@ -132,46 +128,41 @@ final class LevelSceneController {
         scene.rootNode.addChildNode(cameraNode)
     }
 
-    // MARK: - Işık
+    // MARK: - Flat malzeme yardımcıları
 
-    private func setupLights() {
-        let ambient = SCNNode()
-        ambient.light = SCNLight()
-        ambient.light?.type = .ambient
-        ambient.light?.intensity = 420
-        ambient.light?.color = UIColor(hex: "#FBF3E0")
-        scene.rootNode.addChildNode(ambient)
-
-        let sun = SCNNode()
-        sun.light = SCNLight()
-        sun.light?.type = .directional
-        sun.light?.intensity = 900
-        sun.light?.color = UIColor(hex: "#FFF1D6")
-        sun.light?.castsShadow = true
-        sun.light?.shadowColor = UIColor(white: 0, alpha: 0.28)
-        sun.light?.shadowRadius = 6
-        sun.light?.shadowSampleCount = 16
-        sun.position = SCNVector3(sceneCenter.x + 14, sceneCenter.y + 26, sceneCenter.z + 6)
-        sun.look(at: sceneCenter)
-        scene.rootNode.addChildNode(sun)
+    private func flatMaterial(_ color: UIColor) -> SCNMaterial {
+        let m = SCNMaterial()
+        m.lightingModel = .constant   // ışıktan etkilenmez → düz, grafiksel MV görünümü
+        m.diffuse.contents = color
+        m.isDoubleSided = false
+        return m
     }
 
-    // MARK: - Zemin platosu
+    /// Küpün yüzlerine yönüne göre düz ton verir (üst aydınlık, iki yan iki ton).
+    /// SCNBox yüz sırası: front(+Z), right(+X), back(−Z), left(−X), top(+Y), bottom(−Y).
+    private func faceMaterials(top: UIColor) -> [SCNMaterial] {
+        [
+            flatMaterial(SceneArt.stoneSideDark),   // front (+Z) — kameraya bakan koyu yan
+            flatMaterial(SceneArt.stoneSideLight),  // right (+X) — kameraya bakan açık yan
+            flatMaterial(SceneArt.stoneSideDark),   // back
+            flatMaterial(SceneArt.stoneSideLight),  // left
+            flatMaterial(top),                      // top (+Y) — yürüme yüzeyi
+            flatMaterial(SceneArt.stoneSideDark)    // bottom
+        ]
+    }
+
+    // MARK: - Zemin
 
     private func buildGround() {
         let size = CGFloat(sceneRadius * 2.6 + 8)
-        let ground = SCNBox(width: size, height: 0.8, length: size, chamferRadius: 0)
-        let material = SCNMaterial()
-        material.lightingModel = .physicallyBased
-        material.diffuse.contents = SceneArt.base
-        material.roughness.contents = 0.95
-        ground.materials = [material]
+        let ground = SCNBox(width: size, height: 0.6, length: size, chamferRadius: 0)
+        ground.materials = [flatMaterial(SceneArt.ground)]
         let node = SCNNode(geometry: ground)
-        node.position = SCNVector3(sceneCenter.x, baseY - 0.4, sceneCenter.z)
+        node.position = SCNVector3(sceneCenter.x, baseY - 0.3, sceneCenter.z)
         scene.rootNode.addChildNode(node)
     }
 
-    // MARK: - Döndürücü gruplar + karolar
+    // MARK: - Döndürücüler + karolar
 
     private func buildRotators() {
         for rotator in level.rotators {
@@ -188,37 +179,20 @@ final class LevelSceneController {
             let top = worldPosition(node.point)
             let isRotator = level.rotators.contains { $0.nodeIDs.contains(node.id) }
 
-            // Karo kökü: origin = yürüme yüzeyi. Geometri aşağıya asılır.
             let tile = SCNNode()
             tile.name = "tile:\(node.id)"
 
-            // Gövde sütunu: statik → zemine kadar dolu; dönen → küp blok.
-            let columnHeight = isRotator ? CGFloat(1.0) : CGFloat(max(0.6, top.y - baseY))
-            let column = SCNBox(width: SceneArt.columnWidth, height: columnHeight,
-                                length: SceneArt.columnWidth, chamferRadius: 0.03)
-            let sideMaterial = SCNMaterial()
-            sideMaterial.lightingModel = .physicallyBased
-            sideMaterial.diffuse.contents = SceneArt.stoneSide
-            sideMaterial.roughness.contents = 0.9
-            column.materials = [sideMaterial]
-            let columnNode = SCNNode(geometry: column)
-            columnNode.position = SCNVector3(0, -Float(columnHeight) / 2, 0)
-            columnNode.castsShadow = true
-            tile.addChildNode(columnNode)
+            let height = isRotator ? CGFloat(1.0) : CGFloat(max(0.8, top.y - baseY))
+            let box = SCNBox(width: SceneArt.columnWidth, height: height,
+                             length: SceneArt.columnWidth, chamferRadius: 0.0)
+            let materials = faceMaterials(top: topColor(for: node.id))
+            box.materials = materials
+            let boxNode = SCNNode(geometry: box)
+            boxNode.position = SCNVector3(0, -Float(height) / 2, 0)
+            tile.addChildNode(boxNode)
 
-            // Üst kapak: aydınlık yürüme yüzeyi (Yol Gösteren parıltısı buraya).
-            let cap = SCNBox(width: SceneArt.capWidth, height: SceneArt.capHeight,
-                             length: SceneArt.capWidth, chamferRadius: 0.03)
-            let capMaterial = SCNMaterial()
-            capMaterial.lightingModel = .physicallyBased
-            capMaterial.diffuse.contents = capColor(for: node.id)
-            capMaterial.roughness.contents = 0.75
-            cap.materials = [capMaterial]
-            let capNode = SCNNode(geometry: cap)
-            capNode.position = SCNVector3(0, -Float(SceneArt.capHeight) / 2, 0)
-            capNode.castsShadow = true
-            tile.addChildNode(capNode)
-            tileMaterials[node.id] = capMaterial
+            tileTopMaterials[node.id] = materials[4]
+            tileTopBaseColor[node.id] = topColor(for: node.id)
 
             if let rotatorID = level.rotators.first(where: { $0.nodeIDs.contains(node.id) })?.id,
                let parent = rotatorNodes[rotatorID] {
@@ -233,7 +207,7 @@ final class LevelSceneController {
         }
     }
 
-    private func capColor(for id: String) -> UIColor {
+    private func topColor(for id: String) -> UIColor {
         if id == level.startID { return SceneArt.startTop }
         if id == level.goalID { return SceneArt.goalTop }
         return SceneArt.stoneTop
@@ -241,13 +215,10 @@ final class LevelSceneController {
 
     private func addGoalMarker() {
         guard let goalTile = tileNodes[level.goalID] else { return }
-        let pyramid = SCNPyramid(width: 0.34, height: 0.46, length: 0.34)
-        pyramid.firstMaterial?.lightingModel = .physicallyBased
-        pyramid.firstMaterial?.diffuse.contents = SceneArt.goalTop
-        pyramid.firstMaterial?.emission.contents = SceneArt.glow
-
+        let pyramid = SCNPyramid(width: 0.32, height: 0.44, length: 0.32)
+        pyramid.materials = [flatMaterial(SceneArt.glow)]
         let marker = SCNNode(geometry: pyramid)
-        marker.position = SCNVector3(0, 0.5, 0)   // origin (yürüme yüzeyi) üzerinde
+        marker.position = SCNVector3(0, 0.5, 0)
         marker.runAction(.repeatForever(.rotateBy(x: 0, y: CGFloat.pi * 2, z: 0, duration: 6)))
         goalTile.addChildNode(marker)
     }
@@ -289,7 +260,6 @@ final class LevelSceneController {
     func rotate() {
         guard !isBusy, !reachedGoal else { return }
         guard let rotator = level.rotators.first, let node = rotatorNodes[rotator.id] else { return }
-
         let radians = CGFloat(rotator.stepDegrees * .pi / 180)
         let action = SCNAction.rotateBy(x: 0, y: radians, z: 0, duration: 0.5)
         action.timingMode = .easeInEaseOut
@@ -363,13 +333,13 @@ final class LevelSceneController {
     }
 
     private func applyPowerHighlight() {
-        for material in tileMaterials.values {
-            material.emission.contents = SceneArt.none
+        for (id, material) in tileTopMaterials {
+            material.diffuse.contents = tileTopBaseColor[id]
         }
         guard powerActive else { return }
         guard let path = graph.shortestPath(from: currentNodeID, to: level.goalID) else { return }
         for id in path {
-            tileMaterials[id]?.emission.contents = SceneArt.glow
+            tileTopMaterials[id]?.diffuse.contents = SceneArt.glow
         }
     }
 }

@@ -21,19 +21,18 @@ final class CharacterRig {
         visual.name = "Visual"
 
         let robeGeometry = SCNCone(topRadius: 0.07, bottomRadius: 0.2, height: 0.52)
-        robeGeometry.firstMaterial?.lightingModel = .physicallyBased
+        robeGeometry.firstMaterial?.lightingModel = .constant
         robeGeometry.firstMaterial?.diffuse.contents = color
-        robeGeometry.firstMaterial?.roughness.contents = 0.7
         let robe = SCNNode(geometry: robeGeometry)
         robe.position = SCNVector3(0, 0.26, 0)
-        robe.castsShadow = true
+        robe.castsShadow = false
 
         let headGeometry = SCNSphere(radius: 0.13)
-        headGeometry.firstMaterial?.lightingModel = .physicallyBased
-        headGeometry.firstMaterial?.diffuse.contents = color.withAlphaComponent(0.95)
+        headGeometry.firstMaterial?.lightingModel = .constant
+        headGeometry.firstMaterial?.diffuse.contents = color.withAlphaComponent(0.88)
         let head = SCNNode(geometry: headGeometry)
         head.position = SCNVector3(0, 0.6, 0)
-        head.castsShadow = true
+        head.castsShadow = false
 
         visual.addChildNode(robe)
         visual.addChildNode(head)
