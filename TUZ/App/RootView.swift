@@ -20,7 +20,9 @@ struct RootView: View {
                     case .kelimelik:
                         KelimelikView(memberID: activeMemberID)
                     case .yolculuk:
-                        YolculukPlaceholderView()
+                        YolculukView()
+                    case .yolculukLevel(let id):
+                        LevelView(levelID: id)
                     case .profiller:
                         ProfillerView()
                     case .aileHavuzu:

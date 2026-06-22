@@ -29,5 +29,8 @@ Placeholder ve Meshy aynı sözleşmeyi paylaşır (drop-in). (Faz 2+)
 
 ## Yol Haritası
 Faz 0 iskelet → Faz 1 Zeka Odası → Faz 2 Yolculuk dikey dilimi → Faz 3 sistem → Faz 4 Meshy+cila.
-**Şu an: Faz 0 + Faz 1 (Kelimelik tam çalışır).** Sıradaki: Trivia, Pasaparola, Matematik;
-haftalık ortak hedef/liderlik derinleştirme; ardından Faz 2 SceneKit dikey dilimi.
+**Şu an: Faz 1 tam (Kelimelik) + Faz 2 temeli.** Faz 2 temeli hazır: SceneKit sahnesi,
+ortografik izometrik kamera, veri-güdümlü modüler ortam (3 prototip bölüm), placeholder
+figür (Character_<Ad> sözleşmesi), tap-to-move (yol grafiği + BFS), "Yol Gösteren" gücü.
+Sıradaki: Faz 2'nin **döndürme + perspektif hizalama** mekaniği (imkânsız geometri);
+ardından Trivia/Pasaparola/Matematik ve Birlik Bölümleri.

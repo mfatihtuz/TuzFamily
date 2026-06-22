@@ -5,6 +5,7 @@ enum Route: Hashable {
     case zekaOdasi
     case kelimelik
     case yolculuk
+    case yolculukLevel(String)   // bölüm (level) kimliği
     case profiller
     case aileHavuzu
 }
