@@ -27,7 +27,10 @@ final class PersistenceController {
         }
 
         if inMemory {
-            FamilyData.seedIfNeeded(in: container.mainContext)
+            // Önizleme/test tohumlaması: `mainContext` @MainActor'a bağlı olduğu için
+            // nonisolated init'ten erişilemez. Aynı container'ı paylaşan ayrı bir
+            // ModelContext kullan (in-memory store ortak; @Query bunu görür).
+            FamilyData.seedIfNeeded(in: ModelContext(container))
         }
     }
 }
