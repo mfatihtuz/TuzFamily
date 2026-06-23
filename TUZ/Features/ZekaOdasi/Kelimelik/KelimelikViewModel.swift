@@ -44,29 +44,14 @@ final class KelimelikViewModel {
 
     private func setupLevel() {
         level = KelimelikProgression.level(at: levelIndex)
-        answer = bank.answer(length: level.wordLength, index: levelIndex)
-        hintPositions = Self.hintPositions(count: level.hintCount, length: level.wordLength, seed: levelIndex)
+        // Her seferinde rastgele kelime ve rastgele ipucu konumları.
+        answer = bank.randomAnswer(length: level.wordLength)
+        hintPositions = Set(Array(0..<level.wordLength).shuffled().prefix(level.hintCount))
         guesses = []
         current = ""
         state = .playing
         letterStates = [:]
         message = nil
-    }
-
-    /// Deterministik ipucu konumları (aynı seviyede hep aynı ipuçları).
-    private static func hintPositions(count: Int, length: Int, seed: Int) -> Set<Int> {
-        guard count > 0, length > 0 else { return [] }
-        var positions = Array(0..<length)
-        var s = UInt64(bitPattern: Int64(seed &* 2_654_435_761 &+ 1))
-        func nextInt() -> Int {
-            s = s &* 6_364_136_223_846_793_005 &+ 1_442_695_040_888_963_407
-            return Int(s >> 33)
-        }
-        for i in stride(from: positions.count - 1, to: 0, by: -1) {
-            let j = nextInt() % (i + 1)
-            positions.swapAt(i, j)
-        }
-        return Set(positions.prefix(count))
     }
 
     /// İpucu satırı: açık konumlarda harf, diğerlerinde boş.
@@ -142,9 +127,12 @@ final class KelimelikViewModel {
         onScore?(points())
     }
 
+    /// Puan = (yeşil harf × 3) + (kalan deneme × 2) + (kelime bulunduysa 10).
+    /// Kazanınca tüm harfler yeşildir → yeşil harf sayısı = kelime uzunluğu.
     private func points() -> Int {
+        let greens = wordLength
         let left = max(0, attempts - guesses.count)
-        return level.wordLength * 10 + left * 5 + 10
+        return greens * 3 + left * 2 + 10
     }
 
     // MARK: - Izgara

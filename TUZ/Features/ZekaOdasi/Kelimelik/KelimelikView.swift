@@ -16,7 +16,8 @@ struct KelimelikView: View {
     }
 
     private var gridWidth: CGFloat {
-        min(340, CGFloat(vm.wordLength) * 60)
+        // 3 harfte büyük, 8 harfte sığacak şekilde küçük kutular
+        min(360, CGFloat(vm.wordLength) * 46)
     }
 
     var body: some View {
