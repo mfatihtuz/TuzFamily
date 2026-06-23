@@ -1,15 +1,22 @@
 # TÜZ — Proje Hafızası (CLAUDE.md)
 
-> **Bu dosya projenin kalıcı hafızasıdır. Her oturum başında bunu ve `ROADMAP.md`'yi oku.**
-> Kaldığımız yerden devam et; **Kilitli Kararlar**ı yeniden tartışma. Büyük kapsam ya da
-> yeni bir yön gerekiyorsa önce sor. Tasarımın tamamı `TUZ_Tasarim_Dokumani.md`'de,
-> güç tablosu `TUZ_Karakter_Guc_Sistemi.xlsx`'te.
+> **Bu dosya projenin kalıcı hafızasıdır. Her oturum başında bunu, `ROADMAP.md` ve
+> `DEVLOG.md`'yi oku.** Kaldığımız yerden devam et; **Kilitli Kararlar**ı yeniden tartışma.
+> Büyük kapsam ya da yeni bir yön gerekiyorsa önce sor. Tasarımın tamamı
+> `TUZ_Tasarim_Dokumani.md`'de, güç tablosu `TUZ_Karakter_Guc_Sistemi.xlsx`'te.
 
 ## Oturum başlangıç checklist
 1. `CLAUDE.md` + `ROADMAP.md` oku.
 2. (Mac'te) Derle, simülatörde çalıştır, ekran görüntüsü al → "Build/Run/Screenshot" bölümü.
 3. "Güncel Durum"u doğrula, "Sıradaki Adımlar"dan devam et.
 4. Küçük, **derlenebilir** adımlar; her adımda commit. Belirsizlikte varsayımı yaz, gerekirse sor.
+5. Her anlamlı değişiklikten (commit) sonra **`DEVLOG.md`'ye tarihli bir madde** ekle (ne · neden · dosyalar).
+
+## Dokümanlar (rol dağılımı)
+- **CLAUDE.md** (bu dosya): kurallar + güncel durum + kilitli kararlar (otomatik okunur).
+- **ROADMAP.md**: fazlar, durumlar, sıradaki işler (ileriye dönük plan).
+- **DEVLOG.md**: tarihli detaylı geliştirme kaydı / bilgi bankası (geriye dönük; sürekli güncellenir).
+- **TUZ_Tasarim_Dokumani.md** / **TUZ_Karakter_Guc_Sistemi.xlsx**: tam tasarım ve güç tablosu.
 
 ---
 
