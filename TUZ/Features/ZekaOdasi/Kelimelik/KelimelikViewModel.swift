@@ -34,8 +34,9 @@ final class KelimelikViewModel {
     init(memberID: String, bank: WordBank = .shared) {
         self.memberID = memberID
         self.bank = bank
-        self.levelIndex = UserDefaults.standard.integer(forKey: "kelimelik.level.\(memberID)")
-        self.level = KelimelikProgression.level(at: levelIndex)
+        let startIndex = UserDefaults.standard.integer(forKey: "kelimelik.level.\(memberID)")
+        self.levelIndex = startIndex
+        self.level = KelimelikProgression.level(at: startIndex)
         setupLevel()
     }
 
