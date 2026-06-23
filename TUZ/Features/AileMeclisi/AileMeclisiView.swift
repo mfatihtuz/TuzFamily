@@ -2,14 +2,14 @@ import SwiftUI
 import SwiftData
 
 /// Aile Meclisi — ana hub (GDD §6.4). Buradan Yolculuk, Zeka Odası, Profiller
-/// ve Aile Havuzu'na geçilir. Üstte o an aktif olan aile üyesi gösterilir.
+/// ve Aile Havuzu'na geçilir. Üstte oyuncunun kimliği (selam) gösterilir.
 struct AileMeclisiView: View {
     @Environment(AppRouter.self) private var router
-    @AppStorage("activeMemberID") private var activeMemberID = "bilal"
+    @AppStorage("playerMemberID") private var playerMemberID = ""
     @Query(sort: \FamilyMember.order) private var members: [FamilyMember]
 
-    private var activeMember: FamilyMember? {
-        members.first { $0.memberID == activeMemberID } ?? members.first
+    private var player: FamilyMember? {
+        members.first { $0.memberID == playerMemberID }
     }
 
     private let columns = [
@@ -43,25 +43,26 @@ struct AileMeclisiView: View {
                 .font(TUZFont.callout)
                 .foregroundStyle(TUZColor.inkSoft)
 
-            activeMemberChip
+            greetingChip
         }
         .frame(maxWidth: .infinity)
         .padding(.top, 8)
     }
 
-    private var activeMemberChip: some View {
+    /// Oyuncuya selam veren çip; dokununca Ayarlar'a (kimlik değişimi) gider.
+    private var greetingChip: some View {
         Button {
-            router.push(.profiller)
+            router.push(.ayarlar)
         } label: {
             HStack(spacing: 10) {
-                if let member = activeMember {
+                if let member = player {
                     MemberBadge(
                         initial: String(member.name.prefix(1)),
                         color: Color(hex: member.colorHex),
                         size: 34
                     )
                     VStack(alignment: .leading, spacing: 0) {
-                        Text("Aktif oyuncu")
+                        Text("Merhaba")
                             .font(.caption2)
                             .foregroundStyle(TUZColor.inkSoft)
                         Text(member.name)
@@ -69,11 +70,11 @@ struct AileMeclisiView: View {
                             .foregroundStyle(TUZColor.ink)
                     }
                 } else {
-                    Text("Profil seç")
+                    Text("Ayarlar")
                         .font(TUZFont.headline)
                         .foregroundStyle(TUZColor.ink)
                 }
-                Image(systemName: "chevron.right")
+                Image(systemName: "gearshape.fill")
                     .font(.caption)
                     .foregroundStyle(TUZColor.inkSoft)
             }

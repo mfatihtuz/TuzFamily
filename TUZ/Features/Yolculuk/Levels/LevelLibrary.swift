@@ -52,7 +52,8 @@ enum LevelLibrary {
             .init(a: "b", b: "k")
         ],
         startID: "a",
-        goalID: "g"
+        goalID: "g",
+        characterID: "hatice"
     )
 
     // MARK: - Bölüm 3 — Çarşı (dallı, çok kademeli)
@@ -78,7 +79,8 @@ enum LevelLibrary {
             .init(a: "g", b: "h"), .init(a: "c", b: "x"), .init(a: "a", b: "y")
         ],
         startID: "a",
-        goalID: "h"
+        goalID: "h",
+        characterID: "huzeyfe"
     )
 
     // MARK: - Bölüm 4 — Işıklı Eyvan (döndürme + perspektif hizalama)
@@ -109,6 +111,7 @@ enum LevelLibrary {
         ],
         startID: "s0",
         goalID: "g",
+        characterID: "nur",
         rotators: [
             LevelRotator(id: "arm", pivot: .init(x: 4, y: 2, z: 2), nodeIDs: ["m", "g"])
         ],

@@ -1,39 +1,56 @@
 import SwiftUI
 import SwiftData
 
-/// Navigasyon yığınını kuran, ilk açılışta aile profillerini tohumlayan kök görünüm.
+/// Kök görünüm: ilk açılışta profilleri tohumlar, oyuncu kimliği seçilmemişse
+/// **Onboarding** gösterir, seçilmişse ana navigasyonu kurar.
 struct RootView: View {
     @Environment(\.modelContext) private var modelContext
     @State private var router = AppRouter()
 
-    /// O an aktif olan (skorların yazılacağı) aile üyesinin kimliği.
-    @AppStorage("activeMemberID") private var activeMemberID = "bilal"
+    /// Oyuncunun bu ailedeki kimliği (skorların yazılacağı hane).
+    /// Boşsa onboarding gösterilir. Ayarlar'dan değiştirilebilir.
+    @AppStorage("playerMemberID") private var playerMemberID = ""
 
     var body: some View {
         @Bindable var router = router
-        NavigationStack(path: $router.path) {
-            AileMeclisiView()
-                .navigationDestination(for: Route.self) { route in
-                    switch route {
-                    case .zekaOdasi:
-                        ZekaOdasiView()
-                    case .kelimelik:
-                        KelimelikView(memberID: activeMemberID)
-                    case .yolculuk:
-                        YolculukView()
-                    case .yolculukLevel(let id):
-                        LevelView(levelID: id)
-                    case .profiller:
-                        ProfillerView()
-                    case .aileHavuzu:
-                        AileHavuzuView()
-                    }
+        return Group {
+            if playerMemberID.isEmpty {
+                OnboardingView { chosenID in
+                    playerMemberID = chosenID
                 }
+            } else {
+                NavigationStack(path: $router.path) {
+                    AileMeclisiView()
+                        .navigationDestination(for: Route.self) { route in
+                            destination(for: route)
+                        }
+                }
+                .environment(router)
+            }
         }
-        .environment(router)
         .tint(TUZColor.turquoise)
         .onAppear {
             FamilyData.seedIfNeeded(in: modelContext)
+        }
+    }
+
+    @ViewBuilder
+    private func destination(for route: Route) -> some View {
+        switch route {
+        case .zekaOdasi:
+            ZekaOdasiView()
+        case .kelimelik:
+            KelimelikView(memberID: playerMemberID)
+        case .yolculuk:
+            YolculukView()
+        case .yolculukLevel(let id):
+            LevelView(levelID: id)
+        case .profiller:
+            ProfillerView()
+        case .aileHavuzu:
+            AileHavuzuView()
+        case .ayarlar:
+            SettingsView()
         }
     }
 }

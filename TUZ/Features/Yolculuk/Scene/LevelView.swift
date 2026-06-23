@@ -3,12 +3,11 @@ import SwiftData
 import UIKit
 
 /// Bir bölümün tam ekranı: SceneKit sahnesi + üstüne SwiftUI HUD.
-/// Aktif aile üyesinin rengi/adı figüre uygulanır.
+/// Figür, oyuncu kimliğinden DEĞİL, bölümün **senaryosundaki** karakterden gelir.
 struct LevelView: View {
     let levelID: String
 
     @Environment(\.dismiss) private var dismiss
-    @AppStorage("activeMemberID") private var activeMemberID = "bilal"
     @Query(sort: \FamilyMember.order) private var members: [FamilyMember]
 
     @State private var controller: LevelSceneController?
@@ -33,7 +32,7 @@ struct LevelView: View {
 
     private func setupIfNeeded() {
         guard controller == nil, let level else { return }
-        let member = members.first { $0.memberID == activeMemberID } ?? members.first
+        let member = members.first { $0.memberID == level.characterID } ?? members.first
         let color = UIColor(Color(hex: member?.colorHex ?? "#1C6E8C"))
         let name = member?.name ?? "Bilal"
         controller = LevelSceneController(level: level, characterName: name, characterColor: color)

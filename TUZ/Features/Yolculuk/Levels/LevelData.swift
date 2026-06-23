@@ -57,6 +57,8 @@ struct LevelData: Codable, Hashable, Identifiable {
     var edges: [LevelEdge]
     var startID: String
     var goalID: String
+    /// Bu bölümde sahneye **senaryonun** yerleştirdiği karakter (oyuncu seçmez).
+    var characterID: String
     var rotators: [LevelRotator]
     var seams: [LevelSeam]
 
@@ -68,6 +70,7 @@ struct LevelData: Codable, Hashable, Identifiable {
         edges: [LevelEdge],
         startID: String,
         goalID: String,
+        characterID: String = "bilal",
         rotators: [LevelRotator] = [],
         seams: [LevelSeam] = []
     ) {
@@ -78,6 +81,7 @@ struct LevelData: Codable, Hashable, Identifiable {
         self.edges = edges
         self.startID = startID
         self.goalID = goalID
+        self.characterID = characterID
         self.rotators = rotators
         self.seams = seams
     }
