@@ -7,8 +7,6 @@ import SwiftData
 /// "Yakında" olarak görünür (Faz 1 devamı).
 struct ZekaOdasiView: View {
     @Environment(AppRouter.self) private var router
-    @Environment(\.modelContext) private var modelContext
-    @AppStorage("activeMemberID") private var activeMemberID = "bilal"
 
     var body: some View {
         ScrollView {
@@ -26,8 +24,6 @@ struct ZekaOdasiView: View {
 
     @ViewBuilder
     private func gameCard(for game: GameKind) -> some View {
-        let played = game.isAvailable && hasPlayedToday(game)
-
         Button {
             if game == .kelimelik {
                 router.push(.kelimelik)
@@ -50,13 +46,11 @@ struct ZekaOdasiView: View {
 
                 Spacer()
 
-                if !game.isAvailable {
-                    statusTag(text: "Yakında", color: TUZColor.inkSoft)
-                } else if played {
-                    statusTag(text: "Bugün ✓", color: TUZColor.correct)
-                } else {
+                if game.isAvailable {
                     Image(systemName: "chevron.right")
                         .foregroundStyle(TUZColor.inkSoft)
+                } else {
+                    statusTag(text: "Yakında", color: TUZColor.inkSoft)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -77,10 +71,6 @@ struct ZekaOdasiView: View {
             .clipShape(Capsule())
     }
 
-    private func hasPlayedToday(_ game: GameKind) -> Bool {
-        ScoreService(context: modelContext)
-            .hasPlayed(memberID: activeMemberID, game: game, on: .now)
-    }
 }
 
 #Preview {

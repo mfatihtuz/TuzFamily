@@ -1,8 +1,8 @@
 import SwiftUI
 import SwiftData
 
-/// Kelimelik ekranı: ızgara + klavye + sonuç. Oyun bitince skoru aktif üyenin
-/// profiline ve aile havuzuna (ScoreEntry) yazar.
+/// Kelimelik ekranı — kademeli seviyeler, ipucu satırı, kullanıcı dostu akış.
+/// Yeni seviye kazanınca skor aile havuzuna yazılır.
 struct KelimelikView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \FamilyMember.order) private var members: [FamilyMember]
@@ -15,17 +15,27 @@ struct KelimelikView: View {
         _vm = State(initialValue: KelimelikViewModel(memberID: memberID))
     }
 
-    private var activeMember: FamilyMember? {
-        members.first { $0.memberID == memberID }
+    private var gridWidth: CGFloat {
+        // 3 harfte büyük, 8 harfte sığacak şekilde küçük kutular
+        min(360, CGFloat(vm.wordLength) * 46)
     }
 
     var body: some View {
         VStack(spacing: 12) {
             header
 
+            if vm.hasHints {
+                VStack(spacing: 4) {
+                    Text("İpucu")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(TUZColor.inkSoft)
+                    KelimelikGridView(rows: [vm.hintRow], spacing: 5)
+                        .frame(width: gridWidth)
+                }
+            }
+
             KelimelikGridView(rows: vm.grid)
-                .frame(maxWidth: 360)
-                .padding(.horizontal)
+                .frame(width: gridWidth)
 
             statusArea
 
@@ -46,13 +56,10 @@ struct KelimelikView: View {
         .navigationTitle("Kelimelik")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
-            // Oyun bitince skoru havuza yaz (yalnızca ilk bitişte tetiklenir).
-            vm.onComplete = { points, detail in
+            vm.onScore = { points in
                 ScoreService(context: modelContext).record(
-                    memberID: memberID,
-                    game: .kelimelik,
-                    points: points,
-                    detail: detail
+                    memberID: memberID, game: .kelimelik, points: points,
+                    detail: "seviye"
                 )
             }
         }
@@ -61,26 +68,17 @@ struct KelimelikView: View {
     // MARK: - Başlık
 
     private var header: some View {
-        VStack(spacing: 4) {
-            Text("Günün Kelimesi")
+        VStack(spacing: 3) {
+            Text("Seviye \(vm.level.number)")
+                .font(TUZFont.headline)
+                .foregroundStyle(TUZColor.cini)
+            Text(vm.level.gridLabel)
                 .font(TUZFont.caption)
                 .foregroundStyle(TUZColor.inkSoft)
-            if let member = activeMember {
-                HStack(spacing: 8) {
-                    MemberBadge(
-                        initial: String(member.name.prefix(1)),
-                        color: Color(hex: member.colorHex),
-                        size: 26
-                    )
-                    Text(member.name)
-                        .font(TUZFont.headline)
-                        .foregroundStyle(TUZColor.ink)
-                }
-            }
         }
     }
 
-    // MARK: - Durum / sonuç alanı
+    // MARK: - Durum / sonuç
 
     @ViewBuilder
     private var statusArea: some View {
@@ -92,40 +90,45 @@ struct KelimelikView: View {
                 .frame(height: 24)
                 .animation(.easeInOut, value: vm.message)
 
-        case .won(let attempts):
-            resultBanner(
-                title: "Tebrikler! 🎉",
-                detail: "\(attempts) denemede bildin.",
-                points: max(0, (vm.maxAttempts - attempts + 1)) * 10,
+        case .won:
+            resultCard(
+                title: vm.isLastLevel ? "Tüm seviyeleri bitirdin! 🎉" : "Aferin! 🎉",
+                detail: "+\(vm.earnedPoints) puan · aile havuzuna eklendi",
+                buttonTitle: vm.isLastLevel ? "Yeniden Oyna" : "Sonraki Seviye",
+                action: { vm.isLastLevel ? vm.retry() : vm.nextLevel() },
                 color: TUZColor.correct
             )
 
         case .lost(let answer):
-            resultBanner(
-                title: "Bugün olmadı",
+            resultCard(
+                title: "Bu sefer olmadı",
                 detail: "Kelime: \(answer)",
-                points: 0,
+                buttonTitle: "Tekrar Dene",
+                action: { vm.retry() },
                 color: TUZColor.inkSoft
             )
         }
     }
 
-    private func resultBanner(title: String, detail: String, points: Int, color: Color) -> some View {
-        VStack(spacing: 6) {
+    private func resultCard(title: String, detail: String, buttonTitle: String,
+                            action: @escaping () -> Void, color: Color) -> some View {
+        VStack(spacing: 8) {
             Text(title)
                 .font(TUZFont.headline)
                 .foregroundStyle(color)
             Text(detail)
                 .font(TUZFont.callout)
                 .foregroundStyle(TUZColor.ink)
-            if points > 0 {
-                Text("+\(points) puan · aile havuzuna eklendi")
-                    .font(TUZFont.caption)
-                    .foregroundStyle(TUZColor.inkSoft)
+            Button(action: action) {
+                Text(buttonTitle)
+                    .font(TUZFont.headline)
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 22)
+                    .padding(.vertical, 11)
+                    .background(TUZColor.turquoise, in: Capsule())
             }
-            Text("Yarın yeni kelime!")
-                .font(TUZFont.caption)
-                .foregroundStyle(TUZColor.inkSoft)
+            .buttonStyle(.plain)
+            .padding(.top, 2)
         }
         .frame(maxWidth: .infinity)
         .tuzCard(padding: 12)

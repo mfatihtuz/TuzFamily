@@ -5,8 +5,10 @@ enum Route: Hashable {
     case zekaOdasi
     case kelimelik
     case yolculuk
+    case yolculukLevel(String)   // bölüm (level) kimliği
     case profiller
     case aileHavuzu
+    case ayarlar
 }
 
 /// Uygulamanın navigasyon yığınını yöneten basit yönlendirici.
